@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {DistractionRecorder} from "../src/DistractionRecorder.sol";
 import {AccessRegistry} from "../src/AccessRegistry.sol";
 import {IAccessRegistry} from "../src/interfaces/IAccessRegistry.sol";
@@ -24,10 +24,7 @@ contract DistractionRecorderTest is Test {
         address indexed driver,
         address indexed stakeholder
     );
-    event BlacklistRemoved(
-        address indexed driver,
-        address indexed stakeholder
-    );
+    event BlacklistRemoved(address indexed driver, address indexed stakeholder);
     event DistractedDrivingRecorded(
         address indexed driver,
         string indexed vehicleNumber,
@@ -148,6 +145,69 @@ contract DistractionRecorderTest is Test {
     // CATEGORY 2: Access Control via Modifier Tests
     // ============================================
 
+    function test_BeforeAndAfterBlacklisting_AccessControlChanges() public {
+        // Driver records events
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        recorder.recordDistractionEventDrinking();
+        vm.stopPrank();
+
+        // BEFORE BLACKLISTING: Stakeholder1 can access records
+        vm.prank(stakeholder1);
+        (
+            string[] memory vehicleNumbers,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps.length, 3);
+        assertEq(
+            uint256(eventClasses[0]),
+            uint256(DistractionRecorder.EventClass.TextingRight)
+        );
+        assertEq(
+            uint256(eventClasses[1]),
+            uint256(DistractionRecorder.EventClass.PhoneRight)
+        );
+        assertEq(
+            uint256(eventClasses[2]),
+            uint256(DistractionRecorder.EventClass.Drinking)
+        );
+
+        // Verify stakeholder1 is not blacklisted yet
+        assertFalse(recorder.isBlacklisted(driver1, stakeholder1));
+
+        // Driver blacklists stakeholder1
+        vm.prank(driver1);
+        recorder.blacklistStakeholder(stakeholder1);
+
+        // Verify stakeholder1 is now blacklisted
+        assertTrue(recorder.isBlacklisted(driver1, stakeholder1));
+
+        // AFTER BLACKLISTING: Stakeholder1 CANNOT access records
+        vm.prank(stakeholder1);
+        vm.expectRevert(DistractionRecorder.BlacklistedStakeholder.selector);
+        recorder.getDriverRecords(driver1);
+
+        // Driver records another event
+        vm.prank(driver1);
+        recorder.recordDistractionEventHairMakeup();
+
+        // Stakeholder1 still CANNOT access (even with new records)
+        vm.prank(stakeholder1);
+        vm.expectRevert(DistractionRecorder.BlacklistedStakeholder.selector);
+        recorder.getDriverRecords(driver1);
+
+        // BUT stakeholder2 (not blacklisted, authorized) CAN still access
+        vm.prank(stakeholder2);
+        (
+            string[] memory vehicleNumbers2,
+            DistractionRecorder.EventClass[] memory eventClasses2,
+            uint256[] memory timestamps2
+        ) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps2.length, 4);
+    }
+
     function test_BlacklistedStakeholderCannotAccessRecords() public {
         // Driver records an event
         vm.prank(driver1);
@@ -170,10 +230,17 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 (authorized, not blacklisted) accesses records
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
+        (
+            string[] memory vehicleNumbers,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecords(driver1);
 
-        assertEq(records.length, 1);
-        assertEq(records[0], 0);
+        assertEq(timestamps.length, 1);
+        assertEq(
+            uint256(eventClasses[0]),
+            uint256(DistractionRecorder.EventClass.TextingRight)
+        );
     }
 
     function test_RemovingFromBlacklistRestoresAccess() public {
@@ -196,8 +263,12 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can now access
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
-        assertEq(records.length, 1);
+        (
+            string[] memory vehicleNumbers,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps.length, 1);
     }
 
     function test_BlacklistCheckHappensPriorToAuthorizationCheck() public {
@@ -233,8 +304,8 @@ contract DistractionRecorderTest is Test {
 
         // But stakeholder1 CAN access driver2 records (authorized and not blacklisted by driver2)
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver2);
-        assertEq(records.length, 1);
+        (, , uint256[] memory timestamps) = recorder.getDriverRecords(driver2);
+        assertEq(timestamps.length, 1);
     }
 
     function test_EachDriverManagesTheirOwnBlacklist() public {
@@ -400,8 +471,10 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder can access
         vm.prank(stakeholder1);
-        uint256[] memory recordsBefore = recorder.getDriverRecords(driver1);
-        assertEq(recordsBefore.length, 1);
+        (, , uint256[] memory timestampsBefore) = recorder.getDriverRecords(
+            driver1
+        );
+        assertEq(timestampsBefore.length, 1);
 
         // Driver blacklists after authorization
         vm.prank(driver1);
@@ -433,8 +506,8 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can access again
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
-        assertEq(records.length, 1);
+        (, , uint256[] memory timestamps) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps.length, 1);
 
         // Blacklist again
         vm.prank(driver1);
@@ -508,8 +581,10 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can initially access (registered and authorized)
         vm.prank(stakeholder1);
-        uint256[] memory recordsBefore = recorder.getDriverRecords(driver1);
-        assertEq(recordsBefore.length, 1);
+        (, , uint256[] memory timestampsBefore) = recorder.getDriverRecords(
+            driver1
+        );
+        assertEq(timestampsBefore.length, 1);
 
         // Owner revokes stakeholder1's role in AccessRegistry
         vm.prank(owner);
@@ -528,8 +603,10 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can initially access
         vm.prank(stakeholder1);
-        uint256[] memory recordsBefore = recorder.getDriverRecords(driver1);
-        assertEq(recordsBefore.length, 1);
+        (, , uint256[] memory timestampsBefore) = recorder.getDriverRecords(
+            driver1
+        );
+        assertEq(timestampsBefore.length, 1);
 
         // Driver deauthorizes stakeholder1 in AccessRegistry
         vm.prank(driver1);
@@ -564,7 +641,9 @@ contract DistractionRecorderTest is Test {
         recorder.getDriverRecords(driver1);
     }
 
-    function test_BlacklistPersistsAfterRoleRevocationAndReregistration() public {
+    function test_BlacklistPersistsAfterRoleRevocationAndReregistration()
+        public
+    {
         // Driver blacklists stakeholder1
         vm.prank(driver1);
         recorder.blacklistStakeholder(stakeholder1);
@@ -688,10 +767,9 @@ contract DistractionRecorderTest is Test {
         // Stakeholder1: registered, authorized, not blacklisted
         // All checks should pass
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
+        (, , uint256[] memory timestamps) = recorder.getDriverRecords(driver1);
 
-        assertEq(records.length, 1);
-        assertEq(records[0], 0);
+        assertEq(timestamps.length, 1);
     }
 
     // --- Unregistered Stakeholder Scenarios ---
@@ -787,8 +865,8 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can access with new registry
         vm.prank(stakeholder1);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
-        assertEq(records.length, 1);
+        (, , uint256[] memory timestamps) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps.length, 1);
     }
 
     function test_BlacklistPersistsAcrossRegistryUpdate() public {
@@ -846,8 +924,8 @@ contract DistractionRecorderTest is Test {
 
         // Step 4: Stakeholder can access records
         vm.prank(newStakeholder);
-        uint256[] memory records = recorder.getDriverRecords(driver1);
-        assertEq(records.length, 2);
+        (, , uint256[] memory timestamps) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps.length, 2);
 
         // Step 5: Driver blacklists stakeholder
         vm.prank(driver1);
@@ -864,8 +942,8 @@ contract DistractionRecorderTest is Test {
 
         // Step 8: Stakeholder can access again
         vm.prank(newStakeholder);
-        records = recorder.getDriverRecords(driver1);
-        assertEq(records.length, 2);
+        (, , uint256[] memory timestamps2) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps2.length, 2);
 
         // Step 9: Driver deauthorizes in AccessRegistry
         vm.prank(driver1);
@@ -901,12 +979,12 @@ contract DistractionRecorderTest is Test {
 
         // Stakeholder1 can access driver1 (authorized, not blacklisted)
         vm.prank(stakeholder1);
-        uint256[] memory records1 = recorder.getDriverRecords(driver1);
-        assertEq(records1.length, 1);
+        (, , uint256[] memory timestamps1) = recorder.getDriverRecords(driver1);
+        assertEq(timestamps1.length, 1);
 
         // Stakeholder1 can also access driver2
         vm.prank(stakeholder1);
-        uint256[] memory records2 = recorder.getDriverRecords(driver2);
-        assertEq(records2.length, 1);
+        (, , uint256[] memory timestamps2) = recorder.getDriverRecords(driver2);
+        assertEq(timestamps2.length, 1);
     }
 }

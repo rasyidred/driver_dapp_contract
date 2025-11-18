@@ -32,6 +32,7 @@ contract DistractionRecorder is Ownable {
     /// @notice Structure for storing distraction event records
     struct DistractionRecord {
         address driver;
+        string vehicleNumber;
         EventClass eventClass;
         uint256 timestamp;
     }
@@ -58,10 +59,7 @@ contract DistractionRecorder is Ownable {
         address indexed driver,
         address indexed stakeholder
     );
-    event BlacklistRemoved(
-        address indexed driver,
-        address indexed stakeholder
-    );
+    event BlacklistRemoved(address indexed driver, address indexed stakeholder);
 
     /// @notice Initialize the contract with owner and registry address
     /// @param _owner Address of the contract owner
@@ -137,7 +135,10 @@ contract DistractionRecorder is Ownable {
 
     /// @notice Record a TalkingToPassenger distraction event
     /// @return recordId The ID of the created record
-    function recordDistractionEventTalkingToPassenger() external returns (uint256) {
+    function recordDistractionEventTalkingToPassenger()
+        external
+        returns (uint256)
+    {
         return _recordEvent(EventClass.TalkingToPassenger);
     }
 
@@ -170,12 +171,23 @@ contract DistractionRecorder is Ownable {
         return blacklist[_driver][_stakeholder];
     }
 
-    /// @notice Get all record IDs for a specific driver (authorization required)
+    /// @notice Get all record data for a specific driver (authorization required)
     /// @param _driver Address of the driver
-    /// @return uint256[] Array of record IDs
+    /// @return vehicleNumberList Array of vehicle numbers for each record
+    /// @return eventClassList Array of event classes for each record
+    /// @return timestampList Array of timestamps for each record
     function getDriverRecords(
         address _driver
-    ) external view notBlacklisted(_driver) returns (uint256[] memory) {
+    )
+        external
+        view
+        notBlacklisted(_driver)
+        returns (
+            string[] memory vehicleNumberList,
+            EventClass[] memory eventClassList,
+            uint256[] memory timestampList
+        )
+    {
         if (address(accessRegistry) == address(0)) revert RegistryNotSet();
 
         // Check caller is a registered stakeholder
@@ -187,31 +199,36 @@ contract DistractionRecorder is Ownable {
             revert AccessBlocked();
 
         uint256 count = driverRecordCounts[_driver];
-        uint256[] memory driverRecordIds = new uint256[](count);
+        vehicleNumberList = new string[](count);
+        eventClassList = new EventClass[](count);
+        timestampList = new uint256[](count);
 
         for (uint256 i = 0; i < count; i++) {
-            driverRecordIds[i] = i;
+            vehicleNumberList[i] = driverRecords[_driver][i].vehicleNumber;
+            eventClassList[i] = driverRecords[_driver][i].eventClass;
+            timestampList[i] = driverRecords[_driver][i].timestamp;
         }
 
-        return driverRecordIds;
+        return (vehicleNumberList, eventClassList, timestampList);
     }
 
     /// @notice Internal function to record distraction events
     /// @param _eventClass Type of distraction event
     /// @return recordId The ID of the created record
-    function _recordEvent(
-        EventClass _eventClass
-    ) internal returns (uint256) {
+    function _recordEvent(EventClass _eventClass) internal returns (uint256) {
         if (address(accessRegistry) == address(0)) revert RegistryNotSet();
 
         uint256 recordId = driverRecordCounts[msg.sender];
 
         // Get vehicle plate number from AccessRegistry
-        string memory plateNo = accessRegistry.getDriverVehicleNumber(msg.sender);
+        string memory plateNo = accessRegistry.getDriverVehicleNumber(
+            msg.sender
+        );
 
         DistractionRecord memory newRecord = DistractionRecord({
             timestamp: block.timestamp,
             driver: msg.sender,
+            vehicleNumber: plateNo,
             eventClass: _eventClass
         });
 
