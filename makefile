@@ -2,7 +2,7 @@
 
 .PHONY: all test clean deploy fund help install snapshot format anvil scopefile
 
-DEFAULT_ANVIL_KEY := 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+DEFAULT_ANVIL_KEY := 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6
 
 CONTRACT_NAME=PureWalletV5
 
@@ -55,12 +55,62 @@ aderyn :; aderyn . -o ./docs/aderyn-report.md -x test,script,interfaces
 
 coverage :; forge coverage --rpc-url $(RPC_ETH) --report lcov && genhtml lcov.info -o report --branch-coverage --via-ir
 
-# -----Pure Wallet----- #
-# Deploy PW contract
-deploy-mainnet :; forge script script/PureWallet.s.sol:DeployPureWalletScript --rpc-url $(RPC_ETH) --broadcast -vvvv
+# -----DistractionRecorder & AccessRegistry----- #
+# Deploy to Ethereum Mainnet
+deploy-mainnet:
+	@echo "Deploying to Ethereum Mainnet..."
+	@forge script script/DeployMainnet.s.sol:DeployMainnet \
+		--rpc-url $(RPC_ETH) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(ETHERSCAN_API_KEY) \
+		-vvvv
 
-deploy-fork :; forge script script/PureWallet.s.sol:DeployPureWalletScript --rpc-url $(RPC_FORK) --broadcast -vvvv
+# Deploy to Sepolia Testnet
+deploy-sepolia:
+	@echo "Deploying to Sepolia Testnet..."
+	@forge script script/DeploySepolia.s.sol:DeploySepolia \
+		--rpc-url $(RPC_ETH_SEPOLIA) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(ETHERSCAN_API_KEY) \
+		-vvvv
 
-deploy-sepolia :; forge script script/PureWallet.s.sol:DeployPureWalletTestnetScript --rpc-url $(RPC_ETH_SEPOLIA) --broadcast -vvvv
+# Deploy to Holesky Testnet
+deploy-holesky:
+	@echo "Deploying to Holesky Testnet..."
+	@forge script script/DeployHolesky.s.sol:DeployHolesky \
+		--rpc-url $(RPC_ETH_HOLESKY) \
+		--broadcast \
+		--verify \
+		--etherscan-api-key $(ETHERSCAN_API_KEY) \
+		-vvvv
 
-deploy-holesky :; forge script script/PureWallet.s.sol:DeployPureWalletTestnetScript --rpc-url $(RPC_ETH_HOLESKY) --broadcast -vvvv
+# Deploy to local Anvil for testing
+deploy-local:
+	@echo "Deploying to local Anvil..."
+	@forge script script/DeployLocal.s.sol:Deploy \
+		--rpc-url http://localhost:8545 \
+		--broadcast \
+		-vvvv
+
+
+# Dry-run deployment (simulation without broadcasting)
+deploy-mainnet-dry:
+	@echo "Simulating Mainnet deployment..."
+	@forge script script/DeployMainnet.s.sol:DeployMainnet \
+		--rpc-url $(RPC_ETH) \
+		-vvvv
+
+deploy-sepolia-dry:
+	@echo "Simulating Sepolia deployment..."
+	@forge script script/DeploySepolia.s.sol:DeploySepolia \
+		--rpc-url $(RPC_ETH_SEPOLIA) \
+		-vvvv
+
+deploy-holesky-dry:
+	@echo "Simulating Holesky deployment..."
+	@forge script script/DeployHolesky.s.sol:DeployHolesky \
+		--rpc-url $(RPC_ETH_HOLESKY) \
+		-vvvv
+
