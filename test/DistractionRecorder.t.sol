@@ -987,4 +987,239 @@ contract DistractionRecorderTest is Test {
         (, , uint256[] memory timestamps2) = recorder.getDriverRecords(driver2);
         assertEq(timestamps2.length, 1);
     }
+
+    // ============================================
+    // CATEGORY 8: Paginated Query Tests
+    // ============================================
+
+    function test_PaginatedQuery_FirstPage() public {
+        // Driver records 5 events
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        recorder.recordDistractionEventDrinking();
+        recorder.recordDistractionEventRadio();
+        recorder.recordDistractionEventHairMakeup();
+        vm.stopPrank();
+
+        // Stakeholder queries first 3 records (offset=0, limit=3)
+        vm.prank(stakeholder1);
+        (
+            ,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 3);
+
+        assertEq(timestamps.length, 3);
+        assertEq(
+            uint256(eventClasses[0]),
+            uint256(DistractionRecorder.EventClass.TextingRight)
+        );
+        assertEq(
+            uint256(eventClasses[1]),
+            uint256(DistractionRecorder.EventClass.PhoneRight)
+        );
+        assertEq(
+            uint256(eventClasses[2]),
+            uint256(DistractionRecorder.EventClass.Drinking)
+        );
+    }
+
+    function test_PaginatedQuery_SecondPage() public {
+        // Driver records 5 events
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        recorder.recordDistractionEventDrinking();
+        recorder.recordDistractionEventRadio();
+        recorder.recordDistractionEventHairMakeup();
+        vm.stopPrank();
+
+        // Stakeholder queries second page (offset=3, limit=3)
+        vm.prank(stakeholder1);
+        (
+            ,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 3, 3);
+
+        // Should return only 2 records (total is 5, offset is 3)
+        assertEq(timestamps.length, 2);
+        assertEq(
+            uint256(eventClasses[0]),
+            uint256(DistractionRecorder.EventClass.Radio)
+        );
+        assertEq(
+            uint256(eventClasses[1]),
+            uint256(DistractionRecorder.EventClass.HairMakeup)
+        );
+    }
+
+    function test_PaginatedQuery_OffsetBeyondRecords() public {
+        // Driver records 3 events
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        recorder.recordDistractionEventDrinking();
+        vm.stopPrank();
+
+        // Stakeholder queries with offset beyond records (offset=10, limit=5)
+        vm.prank(stakeholder1);
+        (
+            string[] memory vehicleNumbers,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 10, 5);
+
+        // Should return empty arrays
+        assertEq(timestamps.length, 0);
+        assertEq(eventClasses.length, 0);
+        assertEq(vehicleNumbers.length, 0);
+    }
+
+    function test_PaginatedQuery_LimitExceedsTotalRecords() public {
+        // Driver records 3 events
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        recorder.recordDistractionEventDrinking();
+        vm.stopPrank();
+
+        // Stakeholder queries with limit > total records (offset=0, limit=100)
+        vm.prank(stakeholder1);
+        (
+            ,
+            ,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 100);
+
+        // Should return all 3 records
+        assertEq(timestamps.length, 3);
+    }
+
+    function test_PaginatedQuery_BlacklistedStakeholderBlocked() public {
+        // Driver records events
+        vm.prank(driver1);
+        recorder.recordDistractionEventTextingRight();
+
+        // Driver blacklists stakeholder1
+        vm.prank(driver1);
+        recorder.blacklistStakeholder(stakeholder1);
+
+        // Stakeholder1 tries to access paginated records
+        vm.prank(stakeholder1);
+        vm.expectRevert(DistractionRecorder.BlacklistedStakeholder.selector);
+        recorder.getDriverRecordsPaginated(driver1, 0, 10);
+    }
+
+    function test_PaginatedQuery_UnauthorizedStakeholderBlocked() public {
+        // Driver records event
+        vm.prank(driver1);
+        recorder.recordDistractionEventTextingRight();
+
+        // stakeholder3 is registered but not authorized by driver1
+        vm.prank(stakeholder3);
+        vm.expectRevert(DistractionRecorder.AccessBlocked.selector);
+        recorder.getDriverRecordsPaginated(driver1, 0, 10);
+    }
+
+    function test_PaginatedQuery_UnregisteredStakeholderBlocked() public {
+        // Driver records event
+        vm.prank(driver1);
+        recorder.recordDistractionEventTextingRight();
+
+        // Unregistered stakeholder tries to access
+        vm.prank(nonStakeholder);
+        vm.expectRevert(DistractionRecorder.UnauthorizedStakeholder.selector);
+        recorder.getDriverRecordsPaginated(driver1, 0, 10);
+    }
+
+    function test_PaginatedQuery_EmptyRecords() public {
+        // Driver has no records yet
+
+        // Stakeholder queries records (should return empty arrays)
+        vm.prank(stakeholder1);
+        (
+            string[] memory vehicleNumbers,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 10);
+
+        assertEq(timestamps.length, 0);
+        assertEq(eventClasses.length, 0);
+        assertEq(vehicleNumbers.length, 0);
+    }
+
+    function test_PaginatedQuery_SingleRecord() public {
+        // Driver records single event
+        vm.prank(driver1);
+        recorder.recordDistractionEventTextingRight();
+
+        // Stakeholder queries with pagination
+        vm.prank(stakeholder1);
+        (
+            ,
+            DistractionRecorder.EventClass[] memory eventClasses,
+            uint256[] memory timestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 10);
+
+        assertEq(timestamps.length, 1);
+        assertEq(
+            uint256(eventClasses[0]),
+            uint256(DistractionRecorder.EventClass.TextingRight)
+        );
+    }
+
+    function test_PaginatedQuery_VehicleNumbersIncluded() public {
+        // Driver records events (vehicle number should be "ABC123" from setUp)
+        vm.startPrank(driver1);
+        recorder.recordDistractionEventTextingRight();
+        recorder.recordDistractionEventPhoneRight();
+        vm.stopPrank();
+
+        // Stakeholder queries records
+        vm.prank(stakeholder1);
+        (
+            string[] memory vehicleNumbers,
+            ,
+
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 10);
+
+        assertEq(vehicleNumbers.length, 2);
+        assertEq(vehicleNumbers[0], "ABC123");
+        assertEq(vehicleNumbers[1], "ABC123");
+    }
+
+    function test_PaginatedQuery_CompareWithFullQuery() public {
+        // Driver records 10 events
+        vm.startPrank(driver1);
+        for (uint256 i = 0; i < 10; i++) {
+            recorder.recordDistractionEventTextingRight();
+        }
+        vm.stopPrank();
+
+        // Get all records with full query
+        vm.prank(stakeholder1);
+        (
+            ,
+            ,
+            uint256[] memory allTimestamps
+        ) = recorder.getDriverRecords(driver1);
+
+        // Get all records with paginated query (offset=0, limit=100)
+        vm.prank(stakeholder1);
+        (
+            ,
+            ,
+            uint256[] memory paginatedTimestamps
+        ) = recorder.getDriverRecordsPaginated(driver1, 0, 100);
+
+        // Should be identical
+        assertEq(allTimestamps.length, paginatedTimestamps.length);
+        assertEq(allTimestamps.length, 10);
+
+        for (uint256 i = 0; i < 10; i++) {
+            assertEq(allTimestamps[i], paginatedTimestamps[i]);
+        }
+    }
 }

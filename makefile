@@ -45,7 +45,12 @@ format :; forge fmt
 anvil :; anvil -m 'test test test test test test test test test test test junk' --steps-tracing --block-time 1
 
 # slither is only in venv, hance make sure to run `source .venv/bin/activate`
-slither :; slither ./src/DriverDapp.sol --config-file slither.config.json --checklist > docs/slither-report.md
+slither :; slither ./src --config-file slither.config.json --checklist > docs/slither-report.md
+
+# Analyze specific contracts with slither
+slither-access-registry :; slither ./src/AccessRegistry.sol --config-file slither.config.json --checklist > docs/slither-access-registry-report.md
+
+slither-distraction-recorder :; slither ./src/DistractionRecorder.sol --config-file slither.config.json --checklist > docs/slither-distraction-recorder-report.md
 
 scope :; tree ./src/ | sed 's/└/#/g; s/──/--/g; s/├/#/g; s/│ /|/g; s/│/|/g'
 

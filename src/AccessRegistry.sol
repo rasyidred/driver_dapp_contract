@@ -9,9 +9,8 @@ import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
 /// @dev Implements role-based access control with driver-specific permissions and vehicle tracking
 /// @dev Owner represents IT department of the area/nation
 contract AccessRegistry is IAccessRegistry, Ownable {
-    // Custom errors for gas efficiency
+    // Custom errors
     error InvalidRole();
-    error InvalidStakeholder();
     error StakeholderNotRegistered();
     error ZeroAddress();
 

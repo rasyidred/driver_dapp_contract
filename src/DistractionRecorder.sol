@@ -171,13 +171,18 @@ contract DistractionRecorder is Ownable {
         return blacklist[_driver][_stakeholder];
     }
 
-    /// @notice Get all record data for a specific driver (authorization required)
+    /// @notice Get paginated record data for a specific driver (authorization required)
+    /// @dev Useful for querying large datasets, especially in Remix or limited gas contexts
     /// @param _driver Address of the driver
-    /// @return vehicleNumberList Array of vehicle numbers for each record
-    /// @return eventClassList Array of event classes for each record
-    /// @return timestampList Array of timestamps for each record
-    function getDriverRecords(
-        address _driver
+    /// @param _offset Starting index (0-based)
+    /// @param _limit Maximum number of records to return
+    /// @return vehicleNumberList Array of vehicle numbers for the requested range
+    /// @return eventClassList Array of event classes for the requested range
+    /// @return timestampList Array of timestamps for the requested range
+    function getDriverRecordsPaginated(
+        address _driver,
+        uint256 _offset,
+        uint256 _limit
     )
         external
         view
@@ -199,14 +204,26 @@ contract DistractionRecorder is Ownable {
             revert AccessBlocked();
 
         uint256 count = driverRecordCounts[_driver];
-        vehicleNumberList = new string[](count);
-        eventClassList = new EventClass[](count);
-        timestampList = new uint256[](count);
 
-        for (uint256 i = 0; i < count; i++) {
-            vehicleNumberList[i] = driverRecords[_driver][i].vehicleNumber;
-            eventClassList[i] = driverRecords[_driver][i].eventClass;
-            timestampList[i] = driverRecords[_driver][i].timestamp;
+        // Calculate the actual end index
+        uint256 end = _offset + _limit;
+        if (end > count) {
+            end = count;
+        }
+
+        // Calculate result size
+        uint256 resultSize = end > _offset ? end - _offset : 0;
+
+        vehicleNumberList = new string[](resultSize);
+        eventClassList = new EventClass[](resultSize);
+        timestampList = new uint256[](resultSize);
+
+        for (uint256 i = 0; i < resultSize; i++) {
+            uint256 recordIndex = _offset + i;
+            vehicleNumberList[i] = driverRecords[_driver][recordIndex]
+                .vehicleNumber;
+            eventClassList[i] = driverRecords[_driver][recordIndex].eventClass;
+            timestampList[i] = driverRecords[_driver][recordIndex].timestamp;
         }
 
         return (vehicleNumberList, eventClassList, timestampList);
@@ -224,6 +241,10 @@ contract DistractionRecorder is Ownable {
         string memory plateNo = accessRegistry.getDriverVehicleNumber(
             msg.sender
         );
+
+        if (bytes(plateNo).length == 0) {
+            plateNo = "XXX-0000";
+        }
 
         DistractionRecord memory newRecord = DistractionRecord({
             timestamp: block.timestamp,
