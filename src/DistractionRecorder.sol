@@ -8,13 +8,6 @@ import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
 /// @notice Records and stores distracted driving events detected by AI monitoring systems
 /// @dev Integrates with AccessRegistry for access control
 contract DistractionRecorder is Ownable {
-    // Custom errors
-    error ZeroAddress();
-    error UnauthorizedStakeholder();
-    error AccessBlocked();
-    error RegistryNotSet();
-    error BlacklistedStakeholder();
-
     /// @notice Types of distracted driving events
     enum EventClass {
         SafeDriving,
@@ -43,8 +36,6 @@ contract DistractionRecorder is Ownable {
     mapping(address driver => mapping(uint256 recordId => DistractionRecord))
         public driverRecords;
     mapping(address driver => uint256 count) public driverRecordCounts;
-    mapping(address driver => mapping(address stakeholder => bool isBlacklisted))
-        public blacklist;
 
     // Events
     event DistractedDrivingRecorded(
@@ -55,33 +46,27 @@ contract DistractionRecorder is Ownable {
         uint256 recordId
     );
     event AccessRegistryUpdated(address indexed newRegistry);
-    event StakeholderBlacklisted(
-        address indexed driver,
-        address indexed stakeholder
-    );
-    event BlacklistRemoved(address indexed driver, address indexed stakeholder);
 
     /// @notice Initialize the contract with owner and registry address
     /// @param _owner Address of the contract owner
     /// @param _accessRegistry Address of the AccessRegistry contract
     constructor(address _owner, address _accessRegistry) Ownable(_owner) {
-        if (_owner == address(0)) revert ZeroAddress();
-        if (_accessRegistry == address(0)) revert ZeroAddress();
+        require(_owner != address(0), "DR_ZeroAddress");
+        require(_accessRegistry != address(0), "DR_ZeroAddress");
         accessRegistry = IAccessRegistry(_accessRegistry);
     }
 
     /// @notice Update the AccessRegistry contract address (owner only)
     /// @param _newRegistry Address of the new AccessRegistry contract
     function setAccessRegistry(address _newRegistry) external onlyOwner {
-        if (_newRegistry == address(0)) revert ZeroAddress();
+        require(_newRegistry != address(0), "DR_ZeroAddress");
         accessRegistry = IAccessRegistry(_newRegistry);
         emit AccessRegistryUpdated(_newRegistry);
     }
 
-    /// @notice Modifier to check if caller is not blacklisted by the driver
-    /// @param _driver Address of the driver whose blacklist to check
-    modifier notBlacklisted(address _driver) {
-        if (blacklist[_driver][msg.sender]) revert BlacklistedStakeholder();
+    /// @notice Modifier to restrict function access to AccessRegistry contract only
+    modifier onlyAccessRegistry() {
+        require(msg.sender == address(accessRegistry), "DR_UnauthorizedCaller");
         _;
     }
 
@@ -142,36 +127,8 @@ contract DistractionRecorder is Ownable {
         return _recordEvent(EventClass.TalkingToPassenger);
     }
 
-    /// @notice Blacklist a stakeholder from accessing driver records
-    /// @param _stakeholder Address of the stakeholder to blacklist
-    /// @dev Only the driver (msg.sender) can blacklist stakeholders from their own data
-    function blacklistStakeholder(address _stakeholder) external {
-        if (_stakeholder == address(0)) revert ZeroAddress();
-        blacklist[msg.sender][_stakeholder] = true;
-        emit StakeholderBlacklisted(msg.sender, _stakeholder);
-    }
-
-    /// @notice Remove a stakeholder from the blacklist
-    /// @param _stakeholder Address of the stakeholder to remove from blacklist
-    /// @dev Only the driver (msg.sender) can manage their own blacklist
-    function removeFromBlacklist(address _stakeholder) external {
-        if (_stakeholder == address(0)) revert ZeroAddress();
-        blacklist[msg.sender][_stakeholder] = false;
-        emit BlacklistRemoved(msg.sender, _stakeholder);
-    }
-
-    /// @notice Check if a stakeholder is blacklisted by a driver
-    /// @param _driver Address of the driver
-    /// @param _stakeholder Address of the stakeholder to check
-    /// @return bool True if stakeholder is blacklisted, false otherwise
-    function isBlacklisted(
-        address _driver,
-        address _stakeholder
-    ) external view returns (bool) {
-        return blacklist[_driver][_stakeholder];
-    }
-
-    /// @notice Get paginated record data for a specific driver (authorization required)
+    /// @notice Get paginated record data for a specific driver
+    /// @dev Only callable by AccessRegistry contract - authorization checks performed there
     /// @dev Useful for querying large datasets, especially in Remix or limited gas contexts
     /// @param _driver Address of the driver
     /// @param _offset Starting index (0-based)
@@ -179,30 +136,20 @@ contract DistractionRecorder is Ownable {
     /// @return vehicleNumberList Array of vehicle numbers for the requested range
     /// @return eventClassList Array of event classes for the requested range
     /// @return timestampList Array of timestamps for the requested range
-    function getDriverRecordsPaginated(
+    function getDriverRecords(
         address _driver,
         uint256 _offset,
         uint256 _limit
     )
         external
         view
-        notBlacklisted(_driver)
+        onlyAccessRegistry
         returns (
             string[] memory vehicleNumberList,
             EventClass[] memory eventClassList,
             uint256[] memory timestampList
         )
     {
-        if (address(accessRegistry) == address(0)) revert RegistryNotSet();
-
-        // Check caller is a registered stakeholder
-        if (!accessRegistry.isRegisteredStakeholder(msg.sender))
-            revert UnauthorizedStakeholder();
-
-        // Check caller is authorized by the driver
-        if (!accessRegistry.isAuthorized(_driver, msg.sender))
-            revert AccessBlocked();
-
         uint256 count = driverRecordCounts[_driver];
 
         // Calculate the actual end index
@@ -233,7 +180,7 @@ contract DistractionRecorder is Ownable {
     /// @param _eventClass Type of distraction event
     /// @return recordId The ID of the created record
     function _recordEvent(EventClass _eventClass) internal returns (uint256) {
-        if (address(accessRegistry) == address(0)) revert RegistryNotSet();
+        require(address(accessRegistry) != address(0), "DR_RegistryNotSet");
 
         uint256 recordId = driverRecordCounts[msg.sender];
 
