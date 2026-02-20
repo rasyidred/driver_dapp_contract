@@ -33,16 +33,13 @@ interface IDistractionRecorder {
     function setAccessRegistry(address _newRegistry) external;
 
     /// @notice Get total count of records for a driver (for pagination metadata)
-    function getDriverRecordCount(
-        address _driver
-    ) external view returns (uint256);
+    function getDriverRecordCount(address _driver) external view returns (uint256);
 
     /// @notice Get paginated record data for a specific driver
-    function getDriverRecords(
-        address _driver,
-        uint256 _offset,
-        uint256 _limit
-    ) external view returns (DistractionRecord[] memory records);
+    function getDriverRecords(address _driver, uint256 _offset, uint256 _limit)
+        external
+        view
+        returns (DistractionRecord[] memory records);
 
     // ------------------- Recording Wrappers -------------------
     // These specific functions correspond to the "Algorithm 2" logic
@@ -63,7 +60,5 @@ interface IDistractionRecorder {
 
     function recordDistractionEventHairMakeup() external returns (uint256);
 
-    function recordDistractionEventTalkingToPassenger()
-        external
-        returns (uint256);
+    function recordDistractionEventTalkingToPassenger() external returns (uint256);
 }

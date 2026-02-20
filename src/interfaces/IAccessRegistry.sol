@@ -5,7 +5,6 @@ pragma solidity 0.8.30;
 import {IDistractionRecorder} from "./IDistractionRecorder.sol";
 
 interface IAccessRegistry {
-
     // =============================================================
     //                           TYPES
     // =============================================================
@@ -50,15 +49,8 @@ interface IAccessRegistry {
     /// @notice Gateway function to retrieve driver records AND total count
     /// @return records The array of distraction events
     /// @return totalCount The total number of records (metadata for frontend pagination)
-    function getDistractedDrivingEvents(
-        address _driver,
-        uint256 _offset,
-        uint256 _limit
-    )
+    function getDistractedDrivingEvents(address _driver, uint256 _offset, uint256 _limit)
         external
         view
-        returns (
-            IDistractionRecorder.DistractionRecord[] memory records, 
-            uint256 totalCount
-        );
+        returns (IDistractionRecorder.DistractionRecord[] memory records, uint256 totalCount);
 }

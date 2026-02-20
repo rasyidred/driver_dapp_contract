@@ -32,8 +32,7 @@ contract DistractionRecorder is Ownable {
     // State variables
     IAccessRegistry public accessRegistry;
 
-    mapping(address driver => mapping(uint256 recordId => DistractionRecord))
-        public driverRecords;
+    mapping(address driver => mapping(uint256 recordId => DistractionRecord)) public driverRecords;
     mapping(address driver => uint256 count) public driverRecordCounts;
 
     // Events
@@ -119,10 +118,7 @@ contract DistractionRecorder is Ownable {
 
     /// @notice Record a TalkingToPassenger distraction event
     /// @return recordId The ID of the created record
-    function recordDistractionEventTalkingToPassenger()
-        external
-        returns (uint256)
-    {
+    function recordDistractionEventTalkingToPassenger() external returns (uint256) {
         return _recordEvent(EventClass.TalkingToPassenger);
     }
 
@@ -133,18 +129,15 @@ contract DistractionRecorder is Ownable {
     /// @param _offset Starting index (0-based)
     /// @param _limit Maximum number of records to return
     /// @return records Array of driver distraction records
-    function getDriverRecords(
-        address _driver,
-        uint256 _offset,
-        uint256 _limit
-    ) external view returns (DistractionRecord[] memory records) {
+    function getDriverRecords(address _driver, uint256 _offset, uint256 _limit)
+        external
+        view
+        returns (DistractionRecord[] memory records)
+    {
         require(address(accessRegistry) != address(0), "DR_RegistryNotSet");
 
         // Check caller is a registered Access Registry
-        require(
-            msg.sender == address(accessRegistry),
-            "DR_UnauthorizedAccessRegistry"
-        );
+        require(msg.sender == address(accessRegistry), "DR_UnauthorizedAccessRegistry");
 
         uint256 count = driverRecordCounts[_driver];
 
@@ -178,19 +171,14 @@ contract DistractionRecorder is Ownable {
         uint256 recordId = driverRecordCounts[msg.sender];
 
         // Get vehicle plate number from AccessRegistry
-        string memory plateNo = accessRegistry.getDriverVehicleNumber(
-            msg.sender
-        );
+        string memory plateNo = accessRegistry.getDriverVehicleNumber(msg.sender);
 
         if (bytes(plateNo).length == 0) {
             plateNo = "XXX-0000";
         }
 
-        DistractionRecord memory newRecord = DistractionRecord({
-            vehicleNumber: plateNo,
-            eventClass: _eventClass,
-            timestamp: block.timestamp
-        });
+        DistractionRecord memory newRecord =
+            DistractionRecord({vehicleNumber: plateNo, eventClass: _eventClass, timestamp: block.timestamp});
 
         // Effects: Save new record
         driverRecords[msg.sender][recordId] = newRecord;
@@ -199,13 +187,7 @@ contract DistractionRecorder is Ownable {
         driverRecordCounts[msg.sender]++;
 
         // Interactions: Emit event
-        emit DistractedDrivingRecorded(
-            msg.sender,
-            plateNo,
-            _eventClass,
-            block.timestamp,
-            recordId
-        );
+        emit DistractedDrivingRecorded(msg.sender, plateNo, _eventClass, block.timestamp, recordId);
 
         return recordId;
     }

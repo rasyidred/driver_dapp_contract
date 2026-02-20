@@ -30,24 +30,11 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     //                           EVENTS
     // =============================================================
 
-    event StakeholderRegistered(
-        address indexed stakeholder,
-        StakeholderRole indexed role
-    );
+    event StakeholderRegistered(address indexed stakeholder, StakeholderRole indexed role);
     event StakeholderRevoked(address indexed stakeholder);
-    event StakeholderAuthorized(
-        address indexed driver,
-        address indexed stakeholder
-    );
-    event StakeholderDeauthorized(
-        address indexed driver,
-        address indexed stakeholder
-    );
-    event VehicleNumberUpdated(
-        address indexed driver,
-        string indexed vehicleNumber,
-        uint256 indexed timestamp
-    );
+    event StakeholderAuthorized(address indexed driver, address indexed stakeholder);
+    event StakeholderDeauthorized(address indexed driver, address indexed stakeholder);
+    event VehicleNumberUpdated(address indexed driver, string indexed vehicleNumber, uint256 indexed timestamp);
     event DistractionRecorderUpdated(address indexed newRecorder);
 
     // =============================================================
@@ -65,10 +52,7 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     // =============================================================
 
     /// @notice Register a stakeholder with a specific role
-    function registerStakeholder(
-        address _stakeholder,
-        StakeholderRole _role
-    ) external onlyOwner {
+    function registerStakeholder(address _stakeholder, StakeholderRole _role) external onlyOwner {
         require(_stakeholder != address(0), "AR_ZeroAddress");
         require(_role != StakeholderRole.None, "AR_InvalidRole");
 
@@ -79,29 +63,21 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     /// @notice Revoke a stakeholder's role
     function revokeStakeholder(address _stakeholder) external onlyOwner {
         require(_stakeholder != address(0), "AR_ZeroAddress");
-        require(
-            stakeholderRoles[_stakeholder] != StakeholderRole.None,
-            "AR_NotRegistered"
-        );
+        require(stakeholderRoles[_stakeholder] != StakeholderRole.None, "AR_NotRegistered");
 
         stakeholderRoles[_stakeholder] = StakeholderRole.None;
         emit StakeholderRevoked(_stakeholder);
     }
 
     /// @notice Update vehicle number for a driver
-    function updateVehicleForDriver(
-        address _driver,
-        string memory _plateNo
-    ) external onlyOwner {
+    function updateVehicleForDriver(address _driver, string memory _plateNo) external onlyOwner {
         require(_driver != address(0), "AR_ZeroAddress");
         driverVehicleNumbers[_driver] = _plateNo;
         emit VehicleNumberUpdated(_driver, _plateNo, block.timestamp);
     }
 
     /// @notice Set the DistractionRecorder contract address
-    function setDistractionRecorder(
-        address _distractionRecorder
-    ) external onlyOwner {
+    function setDistractionRecorder(address _distractionRecorder) external onlyOwner {
         require(_distractionRecorder != address(0), "AR_ZeroAddress");
         distractionRecorder = _distractionRecorder;
         emit DistractionRecorderUpdated(_distractionRecorder);
@@ -115,10 +91,7 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     /// @dev Driver can only authorize entities that are already registered by IT Dept
     function addAuthorizedStakeholder(address _stakeholder) external {
         require(_stakeholder != address(0), "AR_ZeroAddress");
-        require(
-            stakeholderRoles[_stakeholder] != StakeholderRole.None,
-            "AR_UnknownEntity"
-        );
+        require(stakeholderRoles[_stakeholder] != StakeholderRole.None, "AR_UnknownEntity");
 
         authorizedStakeholders[msg.sender][_stakeholder] = true;
         emit StakeholderAuthorized(msg.sender, _stakeholder);
@@ -137,28 +110,19 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     //                        VIEW FUNCTIONS
     // =============================================================
 
-    function isAuthorized(
-        address _driver,
-        address _stakeholder
-    ) external view returns (bool) {
+    function isAuthorized(address _driver, address _stakeholder) external view returns (bool) {
         return authorizedStakeholders[_driver][_stakeholder];
     }
 
-    function isRegisteredStakeholder(
-        address _stakeholder
-    ) external view returns (bool) {
+    function isRegisteredStakeholder(address _stakeholder) external view returns (bool) {
         return stakeholderRoles[_stakeholder] != StakeholderRole.None;
     }
 
-    function getStakeholderRole(
-        address _stakeholder
-    ) external view returns (StakeholderRole) {
+    function getStakeholderRole(address _stakeholder) external view returns (StakeholderRole) {
         return stakeholderRoles[_stakeholder];
     }
 
-    function getDriverVehicleNumber(
-        address _driver
-    ) external view returns (string memory) {
+    function getDriverVehicleNumber(address _driver) external view returns (string memory) {
         return driverVehicleNumbers[_driver];
     }
 
@@ -173,17 +137,10 @@ contract AccessRegistry is IAccessRegistry, Ownable {
     /// @param _limit Maximum number of records to return
     /// @return records Array of DistractionRecord structs
     /// @return totalCount The total number of records available (for pagination)
-    function getDistractedDrivingEvents(
-        address _driver,
-        uint256 _offset,
-        uint256 _limit
-    )
+    function getDistractedDrivingEvents(address _driver, uint256 _offset, uint256 _limit)
         external
         view
-        returns (
-            IDistractionRecorder.DistractionRecord[] memory records,
-            uint256 totalCount
-        )
+        returns (IDistractionRecorder.DistractionRecord[] memory records, uint256 totalCount)
     {
         require(distractionRecorder != address(0), "AR_RecorderNotSet");
 
@@ -191,29 +148,18 @@ contract AccessRegistry is IAccessRegistry, Ownable {
         // If the caller is NOT the driver, we must perform security checks
         if (msg.sender != _driver) {
             // Check A: Is the caller a recognized entity (Insurance, Police, etc.)?
-            require(
-                stakeholderRoles[msg.sender] != StakeholderRole.None,
-                "AR_UnauthorizedStakeholder"
-            );
+            require(stakeholderRoles[msg.sender] != StakeholderRole.None, "AR_UnauthorizedStakeholder");
 
             // Check B: Has the driver explicitly authorized this specific entity?
-            require(
-                authorizedStakeholders[_driver][msg.sender],
-                "AR_AccessDenied"
-            );
+            require(authorizedStakeholders[_driver][msg.sender], "AR_AccessDenied");
         }
 
         // 2. Fetch Data (Proxy to DistractionRecorder)
-        records = IDistractionRecorder(distractionRecorder).getDriverRecords(
-            _driver,
-            _offset,
-            _limit
-        );
+        records = IDistractionRecorder(distractionRecorder).getDriverRecords(_driver, _offset, _limit);
 
         // 3. Fetch Metadata (Total Count)
         // This ensures the frontend knows the total pages available without extra RPC calls
-        totalCount = IDistractionRecorder(distractionRecorder)
-            .getDriverRecordCount(_driver);
+        totalCount = IDistractionRecorder(distractionRecorder).getDriverRecordCount(_driver);
 
         return (records, totalCount);
     }
