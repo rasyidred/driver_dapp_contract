@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity 0.8.30;
 
-/// @title IDistractionRecorder
-/// @notice Interface for accessing driver distraction records
-/// @dev Used by AccessRegistry to retrieve driver records
 interface IDistractionRecorder {
+    // =============================================================
+    //                           TYPES
+    // =============================================================
+
     enum EventClass {
         SafeDriving,
         TextingRight,
@@ -18,23 +19,51 @@ interface IDistractionRecorder {
         TalkingToPassenger
     }
 
+    struct DistractionRecord {
+        string vehicleNumber;
+        EventClass eventClass;
+        uint256 timestamp;
+    }
+
+    // =============================================================
+    //                       FUNCTIONS
+    // =============================================================
+
+    /// @notice Update the AccessRegistry contract address
+    function setAccessRegistry(address _newRegistry) external;
+
+    /// @notice Get total count of records for a driver (for pagination metadata)
+    function getDriverRecordCount(
+        address _driver
+    ) external view returns (uint256);
+
     /// @notice Get paginated record data for a specific driver
-    /// @param _driver Address of the driver
-    /// @param _offset Starting index (0-based)
-    /// @param _limit Maximum number of records to return
-    /// @return vehicleNumberList Array of vehicle numbers for the requested range
-    /// @return eventClassList Array of event classes for the requested range
-    /// @return timestampList Array of timestamps for the requested range
     function getDriverRecords(
         address _driver,
         uint256 _offset,
         uint256 _limit
-    )
+    ) external view returns (DistractionRecord[] memory records);
+
+    // ------------------- Recording Wrappers -------------------
+    // These specific functions correspond to the "Algorithm 2" logic
+
+    function recordDistractionEventTextingRight() external returns (uint256);
+
+    function recordDistractionEventPhoneRight() external returns (uint256);
+
+    function recordDistractionEventTextingLeft() external returns (uint256);
+
+    function recordDistractionEventPhoneLeft() external returns (uint256);
+
+    function recordDistractionEventRadio() external returns (uint256);
+
+    function recordDistractionEventDrinking() external returns (uint256);
+
+    function recordDistractionEventReachingBehind() external returns (uint256);
+
+    function recordDistractionEventHairMakeup() external returns (uint256);
+
+    function recordDistractionEventTalkingToPassenger()
         external
-        view
-        returns (
-            string[] memory vehicleNumberList,
-            EventClass[] memory eventClassList,
-            uint256[] memory timestampList
-        );
+        returns (uint256);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity 0.8.30;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
@@ -24,7 +24,6 @@ contract DistractionRecorder is Ownable {
 
     /// @notice Structure for storing distraction event records
     struct DistractionRecord {
-        address driver;
         string vehicleNumber;
         EventClass eventClass;
         uint256 timestamp;
@@ -48,10 +47,10 @@ contract DistractionRecorder is Ownable {
     event AccessRegistryUpdated(address indexed newRegistry);
 
     /// @notice Initialize the contract with owner and registry address
-    /// @param _owner Address of the contract owner
+    /// @param _initialOwner Address of the contract owner
     /// @param _accessRegistry Address of the AccessRegistry contract
-    constructor(address _owner, address _accessRegistry) Ownable(_owner) {
-        require(_owner != address(0), "DR_ZeroAddress");
+    constructor(address _initialOwner, address _accessRegistry) Ownable(_initialOwner) {
+        require(_initialOwner != address(0), "DR_ZeroAddress");
         require(_accessRegistry != address(0), "DR_ZeroAddress");
         accessRegistry = IAccessRegistry(_accessRegistry);
     }
@@ -133,23 +132,20 @@ contract DistractionRecorder is Ownable {
     /// @param _driver Address of the driver
     /// @param _offset Starting index (0-based)
     /// @param _limit Maximum number of records to return
-    /// @return vehicleNumberList Array of vehicle numbers for the requested range
-    /// @return eventClassList Array of event classes for the requested range
-    /// @return timestampList Array of timestamps for the requested range
+    /// @return records Array of driver distraction records
     function getDriverRecords(
         address _driver,
         uint256 _offset,
         uint256 _limit
-    )
-        external
-        view
-        onlyAccessRegistry
-        returns (
-            string[] memory vehicleNumberList,
-            EventClass[] memory eventClassList,
-            uint256[] memory timestampList
-        )
-    {
+    ) external view returns (DistractionRecord[] memory records) {
+        require(address(accessRegistry) != address(0), "DR_RegistryNotSet");
+
+        // Check caller is a registered Access Registry
+        require(
+            msg.sender == address(accessRegistry),
+            "DR_UnauthorizedAccessRegistry"
+        );
+
         uint256 count = driverRecordCounts[_driver];
 
         // Calculate the actual end index
@@ -161,19 +157,16 @@ contract DistractionRecorder is Ownable {
         // Calculate result size
         uint256 resultSize = end > _offset ? end - _offset : 0;
 
-        vehicleNumberList = new string[](resultSize);
-        eventClassList = new EventClass[](resultSize);
-        timestampList = new uint256[](resultSize);
+        // Initialize the records array with correct size
+        records = new DistractionRecord[](resultSize);
 
+        // Populate the records array
         for (uint256 i = 0; i < resultSize; i++) {
             uint256 recordIndex = _offset + i;
-            vehicleNumberList[i] = driverRecords[_driver][recordIndex]
-                .vehicleNumber;
-            eventClassList[i] = driverRecords[_driver][recordIndex].eventClass;
-            timestampList[i] = driverRecords[_driver][recordIndex].timestamp;
+            records[i] = driverRecords[_driver][recordIndex];
         }
 
-        return (vehicleNumberList, eventClassList, timestampList);
+        return records;
     }
 
     /// @notice Internal function to record distraction events
@@ -194,10 +187,9 @@ contract DistractionRecorder is Ownable {
         }
 
         DistractionRecord memory newRecord = DistractionRecord({
-            timestamp: block.timestamp,
-            driver: msg.sender,
             vehicleNumber: plateNo,
-            eventClass: _eventClass
+            eventClass: _eventClass,
+            timestamp: block.timestamp
         });
 
         // Effects: Save new record
