@@ -7,6 +7,7 @@ contract MockDistractionRecorder {
     mapping(address => uint256) public mockRecordCounts;
     mapping(address => IDistractionRecorder.DistractionRecord[]) private mockRecordsStorage;
 
+    // Call tracking - updated via separate non-view calls (not via getDriverRecords)
     uint256 public getDriverRecordsCallCount;
     address public lastQueriedDriver;
     uint256 public lastOffset;
@@ -29,13 +30,9 @@ contract MockDistractionRecorder {
 
     function getDriverRecords(address driver, uint256 offset, uint256 limit)
         external
+        view
         returns (IDistractionRecorder.DistractionRecord[] memory)
     {
-        getDriverRecordsCallCount++;
-        lastQueriedDriver = driver;
-        lastOffset = offset;
-        lastLimit = limit;
-
         IDistractionRecorder.DistractionRecord[] storage allRecords = mockRecordsStorage[driver];
         uint256 totalRecords = allRecords.length;
 

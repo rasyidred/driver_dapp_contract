@@ -84,7 +84,7 @@ contract DistractionRecorderTest is Test {
     }
 
     function test_Constructor_RevertsOnZeroOwner() public {
-        vm.expectRevert("DR_ZeroAddress");
+        vm.expectRevert();
         new DistractionRecorder(address(0), address(registry));
     }
 

@@ -3,32 +3,12 @@ pragma solidity 0.8.30;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
+import {IDistractionRecorder} from "./interfaces/IDistractionRecorder.sol";
 
 /// @title DistractionRecorder
 /// @notice Records and stores distracted driving events detected by AI monitoring systems
 /// @dev Integrates with AccessRegistry for access control
-contract DistractionRecorder is Ownable {
-    /// @notice Types of distracted driving events
-    enum EventClass {
-        SafeDriving,
-        TextingRight,
-        PhoneRight,
-        TextingLeft,
-        PhoneLeft,
-        Radio,
-        Drinking,
-        ReachingBehind,
-        HairMakeup,
-        TalkingToPassenger
-    }
-
-    /// @notice Structure for storing distraction event records
-    struct DistractionRecord {
-        string vehicleNumber;
-        EventClass eventClass;
-        uint256 timestamp;
-    }
-
+contract DistractionRecorder is IDistractionRecorder, Ownable {
     // State variables
     IAccessRegistry public accessRegistry;
 
@@ -62,10 +42,18 @@ contract DistractionRecorder is Ownable {
         emit AccessRegistryUpdated(_newRegistry);
     }
 
-    /// @notice Modifier to restrict function access to AccessRegistry contract only
-    modifier onlyAccessRegistry() {
-        require(msg.sender == address(accessRegistry), "DR_UnauthorizedCaller");
-        _;
+    /// @notice Get total count of records for a driver
+    /// @param _driver Address of the driver
+    /// @return count Total number of records stored for the driver
+    function getDriverRecordCount(address _driver) external view returns (uint256) {
+        return driverRecordCounts[_driver];
+    }
+
+    /// @notice Get the vehicle number associated with a driver from the registry
+    /// @param _driver Address of the driver
+    /// @return vehicleNumber The plate number registered for the driver
+    function getDriverVehicleNumber(address _driver) external view returns (string memory) {
+        return accessRegistry.getDriverVehicleNumber(_driver);
     }
 
     /// @notice Record a TextingRight distraction event
