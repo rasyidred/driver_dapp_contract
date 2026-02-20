@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(forge build:*)",
-      "Bash(make build:*)"
+      "Bash(make build:*)",
+      "Bash(forge remappings:*)",
+      "Bash(remappings.txt)"
     ],
     "deny": [],
     "ask": []

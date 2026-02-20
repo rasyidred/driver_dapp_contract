@@ -1,45 +1,56 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity 0.8.30;
 
-/// @title IAccessRegistry
-/// @notice Interface for access control, stakeholder management, and driver information
-/// @dev Used by DistractionRecorder to verify access permissions
+// Import needed to reference the DistractionRecord struct in return values
+import {IDistractionRecorder} from "./IDistractionRecorder.sol";
+
 interface IAccessRegistry {
+    // =============================================================
+    //                           TYPES
+    // =============================================================
+
     enum StakeholderRole {
         None,
-        LogisticsCompany,
-        Police,
-        TrafficAuthority,
-        InsuranceCompany
+        InsuranceCompany,
+        LawEnforcement,
+        FleetManager,
+        RegulatoryBody
     }
 
-    /// @notice Check if a stakeholder is authorized by a driver to access their records
-    /// @param _driver The driver's address
-    /// @param _stakeholder The stakeholder's address
-    /// @return bool True if stakeholder is authorized by driver
-    function isAuthorized(
-        address _driver,
-        address _stakeholder
-    ) external view returns (bool);
+    // =============================================================
+    //                    ADMIN FUNCTIONS
+    // =============================================================
 
-    /// @notice Check if an address is a registered stakeholder
-    /// @param _stakeholder The stakeholder's address
-    /// @return bool True if stakeholder has a role assigned
-    function isRegisteredStakeholder(
-        address _stakeholder
-    ) external view returns (bool);
+    function registerStakeholder(address _stakeholder, StakeholderRole _role) external;
+    function revokeStakeholder(address _stakeholder) external;
+    function updateVehicleForDriver(address _driver, string memory _plateNo) external;
+    function setDistractionRecorder(address _distractionRecorder) external;
 
-    /// @notice Get the role of a stakeholder
-    /// @param _stakeholder The stakeholder's address
-    /// @return StakeholderRole The role assigned to the stakeholder
-    function getStakeholderRole(
-        address _stakeholder
-    ) external view returns (StakeholderRole);
+    // =============================================================
+    //                  DRIVER FUNCTIONS
+    // =============================================================
 
-    /// @notice Get the vehicle number for a driver
-    /// @param _driver The driver's address
-    /// @return string The vehicle plate number
-    function getDriverVehicleNumber(
-        address _driver
-    ) external view returns (string memory);
+    function addAuthorizedStakeholder(address _stakeholder) external;
+    function removeAuthorizedStakeholder(address _stakeholder) external;
+
+    // =============================================================
+    //                        VIEWS
+    // =============================================================
+
+    function isAuthorized(address _driver, address _stakeholder) external view returns (bool);
+    function isRegisteredStakeholder(address _stakeholder) external view returns (bool);
+    function getStakeholderRole(address _stakeholder) external view returns (StakeholderRole);
+    function getDriverVehicleNumber(address _driver) external view returns (string memory);
+
+    // =============================================================
+    //                    DATA GATEWAY
+    // =============================================================
+
+    /// @notice Gateway function to retrieve driver records AND total count
+    /// @return records The array of distraction events
+    /// @return totalCount The total number of records (metadata for frontend pagination)
+    function getDistractedDrivingEvents(address _driver, uint256 _offset, uint256 _limit)
+        external
+        view
+        returns (IDistractionRecorder.DistractionRecord[] memory records, uint256 totalCount);
 }

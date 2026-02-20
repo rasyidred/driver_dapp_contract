@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity 0.8.30;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
@@ -8,13 +8,6 @@ import {IAccessRegistry} from "./interfaces/IAccessRegistry.sol";
 /// @notice Records and stores distracted driving events detected by AI monitoring systems
 /// @dev Integrates with AccessRegistry for access control
 contract DistractionRecorder is Ownable {
-    // Custom errors
-    error ZeroAddress();
-    error UnauthorizedStakeholder();
-    error AccessBlocked();
-    error RegistryNotSet();
-    error BlacklistedStakeholder();
-
     /// @notice Types of distracted driving events
     enum EventClass {
         SafeDriving,
@@ -31,7 +24,6 @@ contract DistractionRecorder is Ownable {
 
     /// @notice Structure for storing distraction event records
     struct DistractionRecord {
-        address driver;
         string vehicleNumber;
         EventClass eventClass;
         uint256 timestamp;
@@ -40,11 +32,8 @@ contract DistractionRecorder is Ownable {
     // State variables
     IAccessRegistry public accessRegistry;
 
-    mapping(address driver => mapping(uint256 recordId => DistractionRecord))
-        public driverRecords;
+    mapping(address driver => mapping(uint256 recordId => DistractionRecord)) public driverRecords;
     mapping(address driver => uint256 count) public driverRecordCounts;
-    mapping(address driver => mapping(address stakeholder => bool isBlacklisted))
-        public blacklist;
 
     // Events
     event DistractedDrivingRecorded(
@@ -55,33 +44,27 @@ contract DistractionRecorder is Ownable {
         uint256 recordId
     );
     event AccessRegistryUpdated(address indexed newRegistry);
-    event StakeholderBlacklisted(
-        address indexed driver,
-        address indexed stakeholder
-    );
-    event BlacklistRemoved(address indexed driver, address indexed stakeholder);
 
     /// @notice Initialize the contract with owner and registry address
-    /// @param _owner Address of the contract owner
+    /// @param _initialOwner Address of the contract owner
     /// @param _accessRegistry Address of the AccessRegistry contract
-    constructor(address _owner, address _accessRegistry) Ownable(_owner) {
-        if (_owner == address(0)) revert ZeroAddress();
-        if (_accessRegistry == address(0)) revert ZeroAddress();
+    constructor(address _initialOwner, address _accessRegistry) Ownable(_initialOwner) {
+        require(_initialOwner != address(0), "DR_ZeroAddress");
+        require(_accessRegistry != address(0), "DR_ZeroAddress");
         accessRegistry = IAccessRegistry(_accessRegistry);
     }
 
     /// @notice Update the AccessRegistry contract address (owner only)
     /// @param _newRegistry Address of the new AccessRegistry contract
     function setAccessRegistry(address _newRegistry) external onlyOwner {
-        if (_newRegistry == address(0)) revert ZeroAddress();
+        require(_newRegistry != address(0), "DR_ZeroAddress");
         accessRegistry = IAccessRegistry(_newRegistry);
         emit AccessRegistryUpdated(_newRegistry);
     }
 
-    /// @notice Modifier to check if caller is not blacklisted by the driver
-    /// @param _driver Address of the driver whose blacklist to check
-    modifier notBlacklisted(address _driver) {
-        if (blacklist[_driver][msg.sender]) revert BlacklistedStakeholder();
+    /// @notice Modifier to restrict function access to AccessRegistry contract only
+    modifier onlyAccessRegistry() {
+        require(msg.sender == address(accessRegistry), "DR_UnauthorizedCaller");
         _;
     }
 
@@ -135,73 +118,26 @@ contract DistractionRecorder is Ownable {
 
     /// @notice Record a TalkingToPassenger distraction event
     /// @return recordId The ID of the created record
-    function recordDistractionEventTalkingToPassenger()
-        external
-        returns (uint256)
-    {
+    function recordDistractionEventTalkingToPassenger() external returns (uint256) {
         return _recordEvent(EventClass.TalkingToPassenger);
     }
 
-    /// @notice Blacklist a stakeholder from accessing driver records
-    /// @param _stakeholder Address of the stakeholder to blacklist
-    /// @dev Only the driver (msg.sender) can blacklist stakeholders from their own data
-    function blacklistStakeholder(address _stakeholder) external {
-        if (_stakeholder == address(0)) revert ZeroAddress();
-        blacklist[msg.sender][_stakeholder] = true;
-        emit StakeholderBlacklisted(msg.sender, _stakeholder);
-    }
-
-    /// @notice Remove a stakeholder from the blacklist
-    /// @param _stakeholder Address of the stakeholder to remove from blacklist
-    /// @dev Only the driver (msg.sender) can manage their own blacklist
-    function removeFromBlacklist(address _stakeholder) external {
-        if (_stakeholder == address(0)) revert ZeroAddress();
-        blacklist[msg.sender][_stakeholder] = false;
-        emit BlacklistRemoved(msg.sender, _stakeholder);
-    }
-
-    /// @notice Check if a stakeholder is blacklisted by a driver
-    /// @param _driver Address of the driver
-    /// @param _stakeholder Address of the stakeholder to check
-    /// @return bool True if stakeholder is blacklisted, false otherwise
-    function isBlacklisted(
-        address _driver,
-        address _stakeholder
-    ) external view returns (bool) {
-        return blacklist[_driver][_stakeholder];
-    }
-
-    /// @notice Get paginated record data for a specific driver (authorization required)
+    /// @notice Get paginated record data for a specific driver
+    /// @dev Only callable by AccessRegistry contract - authorization checks performed there
     /// @dev Useful for querying large datasets, especially in Remix or limited gas contexts
     /// @param _driver Address of the driver
     /// @param _offset Starting index (0-based)
     /// @param _limit Maximum number of records to return
-    /// @return vehicleNumberList Array of vehicle numbers for the requested range
-    /// @return eventClassList Array of event classes for the requested range
-    /// @return timestampList Array of timestamps for the requested range
-    function getDriverRecordsPaginated(
-        address _driver,
-        uint256 _offset,
-        uint256 _limit
-    )
+    /// @return records Array of driver distraction records
+    function getDriverRecords(address _driver, uint256 _offset, uint256 _limit)
         external
         view
-        notBlacklisted(_driver)
-        returns (
-            string[] memory vehicleNumberList,
-            EventClass[] memory eventClassList,
-            uint256[] memory timestampList
-        )
+        returns (DistractionRecord[] memory records)
     {
-        if (address(accessRegistry) == address(0)) revert RegistryNotSet();
+        require(address(accessRegistry) != address(0), "DR_RegistryNotSet");
 
-        // Check caller is a registered stakeholder
-        if (!accessRegistry.isRegisteredStakeholder(msg.sender))
-            revert UnauthorizedStakeholder();
-
-        // Check caller is authorized by the driver
-        if (!accessRegistry.isAuthorized(_driver, msg.sender))
-            revert AccessBlocked();
+        // Check caller is a registered Access Registry
+        require(msg.sender == address(accessRegistry), "DR_UnauthorizedAccessRegistry");
 
         uint256 count = driverRecordCounts[_driver];
 
@@ -214,44 +150,35 @@ contract DistractionRecorder is Ownable {
         // Calculate result size
         uint256 resultSize = end > _offset ? end - _offset : 0;
 
-        vehicleNumberList = new string[](resultSize);
-        eventClassList = new EventClass[](resultSize);
-        timestampList = new uint256[](resultSize);
+        // Initialize the records array with correct size
+        records = new DistractionRecord[](resultSize);
 
+        // Populate the records array
         for (uint256 i = 0; i < resultSize; i++) {
             uint256 recordIndex = _offset + i;
-            vehicleNumberList[i] = driverRecords[_driver][recordIndex]
-                .vehicleNumber;
-            eventClassList[i] = driverRecords[_driver][recordIndex].eventClass;
-            timestampList[i] = driverRecords[_driver][recordIndex].timestamp;
+            records[i] = driverRecords[_driver][recordIndex];
         }
 
-        return (vehicleNumberList, eventClassList, timestampList);
+        return records;
     }
 
     /// @notice Internal function to record distraction events
     /// @param _eventClass Type of distraction event
     /// @return recordId The ID of the created record
     function _recordEvent(EventClass _eventClass) internal returns (uint256) {
-        if (address(accessRegistry) == address(0)) revert RegistryNotSet();
+        require(address(accessRegistry) != address(0), "DR_RegistryNotSet");
 
         uint256 recordId = driverRecordCounts[msg.sender];
 
         // Get vehicle plate number from AccessRegistry
-        string memory plateNo = accessRegistry.getDriverVehicleNumber(
-            msg.sender
-        );
+        string memory plateNo = accessRegistry.getDriverVehicleNumber(msg.sender);
 
         if (bytes(plateNo).length == 0) {
             plateNo = "XXX-0000";
         }
 
-        DistractionRecord memory newRecord = DistractionRecord({
-            timestamp: block.timestamp,
-            driver: msg.sender,
-            vehicleNumber: plateNo,
-            eventClass: _eventClass
-        });
+        DistractionRecord memory newRecord =
+            DistractionRecord({vehicleNumber: plateNo, eventClass: _eventClass, timestamp: block.timestamp});
 
         // Effects: Save new record
         driverRecords[msg.sender][recordId] = newRecord;
@@ -260,13 +187,7 @@ contract DistractionRecorder is Ownable {
         driverRecordCounts[msg.sender]++;
 
         // Interactions: Emit event
-        emit DistractedDrivingRecorded(
-            msg.sender,
-            plateNo,
-            _eventClass,
-            block.timestamp,
-            recordId
-        );
+        emit DistractedDrivingRecorded(msg.sender, plateNo, _eventClass, block.timestamp, recordId);
 
         return recordId;
     }

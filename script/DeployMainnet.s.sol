@@ -13,7 +13,7 @@ contract DeployMainnet is Script {
 
     function run() external {
         // Load mainnet private key
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_MAINNET");
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
         console.log("========================================");
@@ -22,10 +22,6 @@ contract DeployMainnet is Script {
         console.log("Deployer Address:", deployer);
         console.log("Chain ID:", block.chainid);
         console.log("========================================");
-
-        // Confirmation prompt (commented out for CI/CD, uncomment for manual deployment)
-        // console.log("\nWARNING: You are deploying to MAINNET!");
-        // console.log("Press Ctrl+C to cancel, or wait 10 seconds to continue...");
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -49,9 +45,8 @@ contract DeployMainnet is Script {
 
         // Summary
         console.log("\n========================================");
-        console.log("MAINNET DEPLOYMENT COMPLETE");
+        console.log("DEPLOYMENT COMPLETE");
         console.log("========================================");
-        console.log("Network: Ethereum Mainnet");
         console.log("Chain ID:", block.chainid);
         console.log("AccessRegistry:", address(accessRegistry));
         console.log("DistractionRecorder:", address(distractionRecorder));

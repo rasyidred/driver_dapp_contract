@@ -6,7 +6,7 @@ DEFAULT_ANVIL_KEY := 0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff
 
 CONTRACT_NAME=PureWalletV5
 
-all: remove install build build-circom-zkp
+all: remove install build 
 
 # Clean the repo
 clean  :; forge clean
@@ -19,8 +19,6 @@ install:
 	forge install foundry-rs/forge-std\
 		&& forge i OpenZeppelin/openzeppelin-contracts 
 
-build-circom-zkp:
-	cd lib/circom-zkp && npm install && make all
 
 # Obtain ABI in json
 abi :
