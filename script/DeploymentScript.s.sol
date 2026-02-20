@@ -5,19 +5,16 @@ import {Script, console} from "forge-std/Script.sol";
 import {AccessRegistry} from "../src/AccessRegistry.sol";
 import {DistractionRecorder} from "../src/DistractionRecorder.sol";
 
-/// @title DeployMainnet
-/// @notice Deployment script for Ethereum Mainnet
-contract DeployMainnet is Script {
+/// @title Deployment Script
+contract DeploymentScript is Script {
     AccessRegistry public accessRegistry;
     DistractionRecorder public distractionRecorder;
 
     function run() external {
-        // Load mainnet private key
+        // Load private key
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        console.log("========================================");
-        console.log("Deploying to ETHEREUM MAINNET");
         console.log("========================================");
         console.log("Deployer Address:", deployer);
         console.log("Chain ID:", block.chainid);
@@ -54,11 +51,11 @@ contract DeployMainnet is Script {
         console.log("========================================");
         console.log("\nSave these addresses for verification:");
         console.log(
-            "export ACCESS_REGISTRY_MAINNET=",
+            "export ACCESS_REGISTRY=",
             vm.toString(address(accessRegistry))
         );
         console.log(
-            "export DISTRACTION_RECORDER_MAINNET=",
+            "export DISTRACTION_RECORDER=",
             vm.toString(address(distractionRecorder))
         );
         console.log("========================================");
