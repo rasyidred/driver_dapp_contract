@@ -1,0 +1,9 @@
+{
+  "filter_paths": "lib, script",
+  "detectors_to_exclude": "solc-version, conformance-to-solidity-naming-conventions, variable-names-too-similar",
+  "disable_color": false,
+  "solc_remaps": [
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/"
+  ]
+}

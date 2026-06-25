@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(forge build:*)",
+      "Bash(make build:*)",
+      "Bash(forge remappings:*)",
+      "Bash(remappings.txt)",
+      "Bash(forge test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
